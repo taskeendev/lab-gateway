@@ -42,3 +42,9 @@ services:
         strip_path: false
         paths:
           - /ws/presence
+
+# ตรวจ JWT ที่ขอบ ทุก route — secret เดียวกับ auth-service (มาจาก env)
+plugins:
+  - name: jwt-hs512
+    config:
+      secret: ${JWT_SECRET}

@@ -16,5 +16,9 @@ jobs:
           python3 render-config.py
       - name: kong validate
         run: |
-          docker run --rm -e KONG_DATABASE=off -v "$PWD/kong/kong.yml:/kong/kong.yml:ro" \
+          docker run --rm -e KONG_DATABASE=off \
+            -e KONG_PLUGINS=bundled,jwt-hs512 \
+            -e KONG_LUA_PACKAGE_PATH="/kong/plugins/?.lua;;" \
+            -v "$PWD/kong/kong.yml:/kong/kong.yml:ro" \
+            -v "$PWD/kong/plugins/jwt-hs512:/kong/plugins/kong/plugins/jwt-hs512:ro" \
             kong:3.9 kong config parse /kong/kong.yml

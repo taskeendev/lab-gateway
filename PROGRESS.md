@@ -10,12 +10,19 @@
 ## บันได 5 ขั้น
 
 - [x] 1. โครง gateway: Kong DB-less + routing 4 service ผ่านจุดเดียว (config render จาก template+env) + CI ตรวจ config — 2026-06-13
-- [ ] 2. JWT ตรวจที่ขอบ: custom Lua plugin verify HS512 secret เดียวกับ auth (ปลอม/หมดอายุ → 401 ที่ Kong)
+- [x] 2. JWT ตรวจที่ขอบ: custom Lua plugin verify HS512 secret เดียวกับ auth (ปลอม/หมดอายุ → 401 ที่ Kong) — 2026-06-13
 - [ ] 3. Rate limiting + CORS + correlation-id (request-id ไหลทุกชั้น)
 - [ ] 4. WebSocket presence ผ่าน Kong + upstream health checks (circuit breaker)
 - [ ] 5. lab-web ยิง Kong จุดเดียว (เลิก vite proxy แยกพอร์ต) + docker compose รวมทั้งระบบ (เกณฑ์เฟส)
 
 ## Log การทำงาน
+
+- 2026-06-13 — ขั้น 2 เสร็จ: custom Lua plugin jwt-hs512 (เขียนเอง โหลดผ่าน KONG_PLUGINS +
+  LUA_PACKAGE_PATH) verify HS512 ด้วย openssl_hmac + secret เดียวกับ auth; ปล่อยถ้าไม่มี token
+  (public), เด้ง 401 ที่ Kong ถ้าลายเซ็นเสีย/หมดอายุ/รูปแบบเพี้ยน, แนบ X-Auth-User/Role ต่อให้
+  service; เทียบลายเซ็นแบบ constant-time; เทสต์ 8 เคส รวมเคสพิสูจน์ "block ก่อนถึง service"
+  (token ปลอมยิง GET /api/posts สาธารณะ → 401 ที่ Kong แทนที่จะ 200 จาก service) + mint token
+  เองด้วย secret เพื่อทดสอบ expired/fresh; CI โหลด plugin ตอน validate ด้วย
 
 - 2026-06-13 — ขั้น 1 เสร็จ: Kong DB-less (kong:3.9) เป็นประตูเดียวที่ :8000; declarative config
   render จาก kong.tmpl.yml + env (render-config.py แทน ${VAR} — ไม่ฝัง URL ในไฟล์ที่ commit,
