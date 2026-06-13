@@ -12,10 +12,17 @@
 - [x] 1. โครง gateway: Kong DB-less + routing 4 service ผ่านจุดเดียว (config render จาก template+env) + CI ตรวจ config — 2026-06-13
 - [x] 2. JWT ตรวจที่ขอบ: custom Lua plugin verify HS512 secret เดียวกับ auth (ปลอม/หมดอายุ → 401 ที่ Kong) — 2026-06-13
 - [x] 3. Rate limiting + CORS + correlation-id (request-id ไหลทุกชั้น) — 2026-06-13
-- [ ] 4. WebSocket presence ผ่าน Kong + upstream health checks (circuit breaker)
+- [x] 4. WebSocket presence ผ่าน Kong + upstream health checks (circuit breaker) — 2026-06-13
 - [ ] 5. lab-web ยิง Kong จุดเดียว (เลิก vite proxy แยกพอร์ต) + docker compose รวมทั้งระบบ (เกณฑ์เฟส)
 
 ## Log การทำงาน
+
+- 2026-06-13 — ขั้น 4 เสร็จ: เปลี่ยน service จาก url ตรง เป็น upstream object (target host:port จาก env)
+  + healthchecks (active probe /health ทุก 3s + passive); WS presence ทะลุ Kong: first-message auth
+  (token ใน message ไม่ใช่ header → jwt plugin ปล่อยผ่าน) ได้ ready+snapshot จริง; circuit breaker:
+  ตัด contact → active healthcheck mark UNHEALTHY → Kong ตอบ 503 เองใน ~40ms ไม่ค้างรอ service ที่ตาย,
+  service กลับมา → healthy เอง; เจอบั๊ก: compose up รอบที่ env port ไม่ติดทำให้ map random port →
+  ย้ำว่าต้อง source .env ก่อนเสมอ (run.sh จัดการให้แล้ว)
 
 - 2026-06-13 — ขั้น 3 เสร็จ: correlation-id (header X-Request-Id ตรงกับ filter ของ service →
   id เดียวไหลทะลุ Kong→service→log, สร้างให้ถ้าไม่มี + echo กลับ client) / cors ที่เดียว

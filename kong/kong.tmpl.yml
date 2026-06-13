@@ -1,71 +1,72 @@
-# Declarative config ของ Kong (DB-less) — ค่า upstream/secret/origin มาจาก template + env
-# ตอน start: render เป็น kong/kong.yml ด้วย env (ดู run.sh) ไม่ฝังค่าจริงในไฟล์ที่ commit
+# Declarative config ของ Kong (DB-less) — upstream/secret/origin จาก template + env
 _format_version: "3.0"
+
+# Upstream = กลุ่มปลายทางของ service + การเช็คสุขภาพ (active probe + passive circuit breaker)
+# ถ้า target ตาย เกินเกณฑ์ → ถูก mark unhealthy → Kong หยุดส่ง (วงจรตัด) ตอบ 503 ทันที ไม่ค้าง
+upstreams:
+  - name: auth-upstream
+    targets: [ { target: "${AUTH_TARGET}" } ]
+    healthchecks: &hc
+      active:
+        http_path: /health
+        healthy:   { interval: 3, successes: 1 }
+        unhealthy: { interval: 3, http_failures: 2, tcp_failures: 2, timeouts: 2 }
+      passive:
+        healthy:   { successes: 1 }
+        unhealthy: { http_failures: 3, tcp_failures: 2, timeouts: 2 }
+  - name: feed-upstream
+    targets: [ { target: "${FEED_TARGET}" } ]
+    healthchecks: *hc
+  - name: contact-upstream
+    targets: [ { target: "${CONTACT_TARGET}" } ]
+    healthchecks: *hc
+  - name: presence-upstream
+    targets: [ { target: "${PRESENCE_TARGET}" } ]
+    healthchecks: *hc
 
 services:
   - name: auth-service
-    url: ${AUTH_UPSTREAM}
+    host: auth-upstream
     routes:
-      # แยก /api/auth (login/register/refresh/logout) ออกมา rate-limit เข้มกว่า — กัน brute force
       - name: auth-public
         strip_path: false
-        paths:
-          - /api/auth
+        paths: [ /api/auth ]
         plugins:
           - name: rate-limiting
-            config:
-              minute: ${AUTH_RATE_LIMIT_PER_MIN}
-              policy: local
+            config: { minute: ${AUTH_RATE_LIMIT_PER_MIN}, policy: local }
       - name: auth-private
         strip_path: false
-        paths:
-          - /api/users
-          - /api/admin
+        paths: [ /api/users, /api/admin ]
 
   - name: feed-service
-    url: ${FEED_UPSTREAM}
+    host: feed-upstream
     routes:
       - name: feed
         strip_path: false
-        paths:
-          - /api/posts
-          - /api/comments
+        paths: [ /api/posts, /api/comments ]
 
   - name: contact-service
-    url: ${CONTACT_UPSTREAM}
+    host: contact-upstream
     routes:
       - name: contact
         strip_path: false
-        paths:
-          - /api/contact
+        paths: [ /api/contact ]
 
   - name: presence-service
-    url: ${PRESENCE_UPSTREAM}
+    host: presence-upstream
     routes:
       - name: presence-rest
         strip_path: false
-        paths:
-          - /api/presence
+        paths: [ /api/presence ]
       - name: presence-ws
         strip_path: false
-        paths:
-          - /ws/presence
+        paths: [ /ws/presence ]
 
-# Plugin ระดับ global — ใช้กับทุก route (route ที่ override เองจะใช้ค่าตัวเอง)
 plugins:
-  # ตรวจ JWT ที่ขอบ — secret เดียวกับ auth-service
   - name: jwt-hs512
-    config:
-      secret: ${JWT_SECRET}
-
-  # request-id ตัวเดียวไหลทะลุ Kong -> service -> log (service อ่าน X-Request-Id อยู่แล้ว)
+    config: { secret: ${JWT_SECRET} }
   - name: correlation-id
-    config:
-      header_name: X-Request-Id
-      generator: uuid
-      echo_downstream: true
-
-  # CORS ที่เดียว จบ — credentials=true เพราะ refresh cookie ต้องเดินทางข้าม origin (prod)
+    config: { header_name: X-Request-Id, generator: uuid, echo_downstream: true }
   - name: cors
     config:
       origins: [${CORS_ORIGINS}]
@@ -74,9 +75,5 @@ plugins:
       exposed_headers: [X-Request-Id]
       credentials: true
       max_age: 3600
-
-  # กันยิงรัวต่อ IP (policy local = นับในหน่วยความจำของ node, เหมาะ DB-less)
   - name: rate-limiting
-    config:
-      minute: ${RATE_LIMIT_PER_MIN}
-      policy: local
+    config: { minute: ${RATE_LIMIT_PER_MIN}, policy: local }
