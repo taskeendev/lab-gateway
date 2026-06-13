@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # render ด้วยค่าตัวอย่าง แล้วให้ Kong ตรวจไวยากรณ์ declarative config จริง
+      - name: render config
+        run: |
+          set -a; source .env.example; set +a
+          python3 render-config.py
+      - name: kong validate
+        run: |
+          docker run --rm -e KONG_DATABASE=off -v "$PWD/kong/kong.yml:/kong/kong.yml:ro" \
+            kong:3.9 kong config parse /kong/kong.yml

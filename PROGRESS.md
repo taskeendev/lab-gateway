@@ -1,0 +1,26 @@
+# lab-gateway — Progress
+
+ส่วนหนึ่งของ **Feature Lab** — API gateway (Kong, DB-less/declarative) คั่นหน้า service ทั้งหมด
+หลักออกแบบ: ประตูเดียวหน้าระบบ · config เป็น declarative ที่ commit/รีวิวได้ · ไม่ฝัง URL (render
+จาก template+env) · JWT ตรวจที่ขอบ + เขียน custom Lua plugin เองเพื่อโชว์ของจริง · ทำบนเครื่องก่อน
+(deploy จริง+domain เป็นเฟสย่อยถัดไป)
+
+สถานะ: ⬜ ยังไม่เริ่ม · 🔨 กำลังทำ · ✅ เสร็จ
+
+## บันได 5 ขั้น
+
+- [x] 1. โครง gateway: Kong DB-less + routing 4 service ผ่านจุดเดียว (config render จาก template+env) + CI ตรวจ config — 2026-06-13
+- [ ] 2. JWT ตรวจที่ขอบ: custom Lua plugin verify HS512 secret เดียวกับ auth (ปลอม/หมดอายุ → 401 ที่ Kong)
+- [ ] 3. Rate limiting + CORS + correlation-id (request-id ไหลทุกชั้น)
+- [ ] 4. WebSocket presence ผ่าน Kong + upstream health checks (circuit breaker)
+- [ ] 5. lab-web ยิง Kong จุดเดียว (เลิก vite proxy แยกพอร์ต) + docker compose รวมทั้งระบบ (เกณฑ์เฟส)
+
+## Log การทำงาน
+
+- 2026-06-13 — ขั้น 1 เสร็จ: Kong DB-less (kong:3.9) เป็นประตูเดียวที่ :8000; declarative config
+  render จาก kong.tmpl.yml + env (render-config.py แทน ${VAR} — ไม่ฝัง URL ในไฟล์ที่ commit,
+  kong.yml ที่ render แล้ว gitignore); routing 4 service: auth (/api/auth,/users,/admin),
+  feed (/api/posts,/comments), contact (/api/contact), presence (/api/presence,/ws/presence)
+  strip_path=false ส่ง path เต็ม; เข้า service บนเครื่องผ่าน host.docker.internal; CI ให้ Kong
+  ตรวจ config จริง (kong config parse, KONG_DATABASE=off); เทสต์ 8 เส้นทะลุ Kong ครบ:
+  login/me/สร้างโพสต์/like/ส่ง contact/กล่อง admin/presence ADMIN 200 + USER 403

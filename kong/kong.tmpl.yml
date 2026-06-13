@@ -1,0 +1,44 @@
+# Declarative config ของ Kong (DB-less) — ค่า upstream มาจาก template + env
+# ตอน start: render เป็น kong/kong.yml ด้วย env (ดู run.sh) ไม่ฝัง URL ในไฟล์ที่ commit
+_format_version: "3.0"
+
+services:
+  - name: auth-service
+    url: ${AUTH_UPSTREAM}
+    routes:
+      - name: auth
+        # strip_path=false: ส่ง path เต็มไปให้ service (service คาดหวัง /api/auth/... ครบ)
+        strip_path: false
+        paths:
+          - /api/auth
+          - /api/users
+          - /api/admin
+
+  - name: feed-service
+    url: ${FEED_UPSTREAM}
+    routes:
+      - name: feed
+        strip_path: false
+        paths:
+          - /api/posts
+          - /api/comments
+
+  - name: contact-service
+    url: ${CONTACT_UPSTREAM}
+    routes:
+      - name: contact
+        strip_path: false
+        paths:
+          - /api/contact
+
+  - name: presence-service
+    url: ${PRESENCE_UPSTREAM}
+    routes:
+      - name: presence-rest
+        strip_path: false
+        paths:
+          - /api/presence
+      - name: presence-ws
+        strip_path: false
+        paths:
+          - /ws/presence
