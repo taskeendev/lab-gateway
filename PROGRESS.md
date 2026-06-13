@@ -11,11 +11,19 @@
 
 - [x] 1. โครง gateway: Kong DB-less + routing 4 service ผ่านจุดเดียว (config render จาก template+env) + CI ตรวจ config — 2026-06-13
 - [x] 2. JWT ตรวจที่ขอบ: custom Lua plugin verify HS512 secret เดียวกับ auth (ปลอม/หมดอายุ → 401 ที่ Kong) — 2026-06-13
-- [ ] 3. Rate limiting + CORS + correlation-id (request-id ไหลทุกชั้น)
+- [x] 3. Rate limiting + CORS + correlation-id (request-id ไหลทุกชั้น) — 2026-06-13
 - [ ] 4. WebSocket presence ผ่าน Kong + upstream health checks (circuit breaker)
 - [ ] 5. lab-web ยิง Kong จุดเดียว (เลิก vite proxy แยกพอร์ต) + docker compose รวมทั้งระบบ (เกณฑ์เฟส)
 
 ## Log การทำงาน
+
+- 2026-06-13 — ขั้น 3 เสร็จ: correlation-id (header X-Request-Id ตรงกับ filter ของ service →
+  id เดียวไหลทะลุ Kong→service→log, สร้างให้ถ้าไม่มี + echo กลับ client) / cors ที่เดียว
+  (origins จาก env, credentials=true รองรับ refresh cookie ข้าม origin, origin แปลกปลอมไม่คืน ACAO)
+  / rate-limiting สองชั้น (global 100/min + เส้น /api/auth เข้ม 20/min กัน brute force, policy local
+  เหมาะ DB-less); แก้บั๊ก: docker compose --env-file แกะ inline array CORS ไม่ได้ → ให้ bash source
+  เองแล้ว compose ใช้ค่า export (--env-file /dev/null); เทสต์ครบ: id propagate, CORS allow/deny,
+  429 หลังครบเพดาน + header RateLimit
 
 - 2026-06-13 — ขั้น 2 เสร็จ: custom Lua plugin jwt-hs512 (เขียนเอง โหลดผ่าน KONG_PLUGINS +
   LUA_PACKAGE_PATH) verify HS512 ด้วย openssl_hmac + secret เดียวกับ auth; ปล่อยถ้าไม่มี token

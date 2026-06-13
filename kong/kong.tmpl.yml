@@ -1,16 +1,24 @@
-# Declarative config ของ Kong (DB-less) — ค่า upstream มาจาก template + env
-# ตอน start: render เป็น kong/kong.yml ด้วย env (ดู run.sh) ไม่ฝัง URL ในไฟล์ที่ commit
+# Declarative config ของ Kong (DB-less) — ค่า upstream/secret/origin มาจาก template + env
+# ตอน start: render เป็น kong/kong.yml ด้วย env (ดู run.sh) ไม่ฝังค่าจริงในไฟล์ที่ commit
 _format_version: "3.0"
 
 services:
   - name: auth-service
     url: ${AUTH_UPSTREAM}
     routes:
-      - name: auth
-        # strip_path=false: ส่ง path เต็มไปให้ service (service คาดหวัง /api/auth/... ครบ)
+      # แยก /api/auth (login/register/refresh/logout) ออกมา rate-limit เข้มกว่า — กัน brute force
+      - name: auth-public
         strip_path: false
         paths:
           - /api/auth
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: ${AUTH_RATE_LIMIT_PER_MIN}
+              policy: local
+      - name: auth-private
+        strip_path: false
+        paths:
           - /api/users
           - /api/admin
 
@@ -43,8 +51,32 @@ services:
         paths:
           - /ws/presence
 
-# ตรวจ JWT ที่ขอบ ทุก route — secret เดียวกับ auth-service (มาจาก env)
+# Plugin ระดับ global — ใช้กับทุก route (route ที่ override เองจะใช้ค่าตัวเอง)
 plugins:
+  # ตรวจ JWT ที่ขอบ — secret เดียวกับ auth-service
   - name: jwt-hs512
     config:
       secret: ${JWT_SECRET}
+
+  # request-id ตัวเดียวไหลทะลุ Kong -> service -> log (service อ่าน X-Request-Id อยู่แล้ว)
+  - name: correlation-id
+    config:
+      header_name: X-Request-Id
+      generator: uuid
+      echo_downstream: true
+
+  # CORS ที่เดียว จบ — credentials=true เพราะ refresh cookie ต้องเดินทางข้าม origin (prod)
+  - name: cors
+    config:
+      origins: [${CORS_ORIGINS}]
+      methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      headers: [Authorization, Content-Type, X-Request-Id]
+      exposed_headers: [X-Request-Id]
+      credentials: true
+      max_age: 3600
+
+  # กันยิงรัวต่อ IP (policy local = นับในหน่วยความจำของ node, เหมาะ DB-less)
+  - name: rate-limiting
+    config:
+      minute: ${RATE_LIMIT_PER_MIN}
+      policy: local
