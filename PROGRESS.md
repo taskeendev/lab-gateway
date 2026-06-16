@@ -13,9 +13,17 @@
 - [x] 2. JWT ตรวจที่ขอบ: custom Lua plugin verify HS512 secret เดียวกับ auth (ปลอม/หมดอายุ → 401 ที่ Kong) — 2026-06-13
 - [x] 3. Rate limiting + CORS + correlation-id (request-id ไหลทุกชั้น) — 2026-06-13
 - [x] 4. WebSocket presence ผ่าน Kong + upstream health checks (circuit breaker) — 2026-06-13
-- [ ] 5. lab-web ยิง Kong จุดเดียว (เลิก vite proxy แยกพอร์ต) + docker compose รวมทั้งระบบ (เกณฑ์เฟส)
+- [x] 5. lab-web ยิง Kong จุดเดียว (เลิก vite proxy แยกพอร์ต) + docker compose รวมทั้งระบบ — 2026-06-16 (orchestration อยู่ repo lab-deploy)
 
 ## Log การทำงาน
+
+- 2026-06-16 — ขั้น 5 เสร็จ = **เฟส gateway จบ**: containerize 4 service (Dockerfile multi-stage
+  Gradle ต่อ repo) + repo `lab-deploy` รวมทั้งระบบเป็น compose เดียว (Kong เข้า service ผ่าน
+  container DNS แทน host.docker.internal, database-per-service 3 PG แยก, depends_on healthy gate);
+  เพิ่ม route /health ผ่าน Kong; lab-web proxy ทุกเส้น→:8000 จุดเดียว; พิสูจน์: cold start ทุก
+  container healthy, smoke 9/9 ทะลุ Kong, circuit breaker (stop contact→503 4ms→start→201), browser/dev
+  ผ่าน Kong; บทเรียน: service เป็น Gradle ไม่ใช่ Maven (Dockerfile ใช้ ./gradlew bootJar, .dockerignore
+  ตัด build/), expect status ต้องตรง REST จริง (register 201/like 204/contact 201)
 
 - 2026-06-13 — ขั้น 4 เสร็จ: เปลี่ยน service จาก url ตรง เป็น upstream object (target host:port จาก env)
   + healthchecks (active probe /health ทุก 3s + passive); WS presence ทะลุ Kong: first-message auth
